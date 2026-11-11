@@ -9,8 +9,6 @@ import java.util.Collection;
 import java.util.Collections;
 
 public class IndexManager implements Serializable {
-    private static final long serialVersionUID = 1L;
-
     private final Map<String, Map<String, Set<Integer>>> indexes = new HashMap<>();
     private final Map<String, String> indexNames = new HashMap<>();
 
