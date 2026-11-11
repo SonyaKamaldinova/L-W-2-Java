@@ -1,4 +1,4 @@
-package classes;
+package library.classes;
 
 public class Author {
 }
