@@ -1,6 +1,5 @@
 package library;
 
-import java.io.Serializable;
 import java.util.Map;
 import java.util.Set;
 import java.util.HashMap;
@@ -8,7 +7,7 @@ import java.util.HashSet;
 import java.util.Collection;
 import java.util.Collections;
 
-public class IndexManager implements Serializable {
+public class IndexManager {
     private final Map<String, Map<String, Set<Integer>>> indexes = new HashMap<>();
     private final Map<String, String> indexNames = new HashMap<>();
 
