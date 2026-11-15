@@ -5,9 +5,8 @@ import library.classes.Author;
 import library.classes.Book;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.Locale;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -56,11 +55,11 @@ public class QueryExecutor {
 
         body = removePrefix(body, "VALUES");
         if (body.isBlank()) {
-            throw new IllegalArgumentException("После VALUES не указаны значения.");
+            throw new IllegalArgumentException("No values are specified after VALUES.");
         }
 
         if (!table.equalsIgnoreCase("Authors") && !table.equalsIgnoreCase("Books")) {
-            throw new IllegalArgumentException("Неизвестная таблица: " + table);
+            throw new IllegalArgumentException("Unknown table: " + table);
         }
 
         Set<String> allowedColumns = table.equalsIgnoreCase("Authors") ? Set.of("id", "name", "birthdate", "alive") : Set.of("id", "title", "authorid", "price", "publishdate", "available");
@@ -69,11 +68,11 @@ public class QueryExecutor {
         for (String column : columns) {
             String normalized = column.trim().toLowerCase(Locale.ROOT);
             if (!allowedColumns.contains(normalized)) {
-                throw new IllegalArgumentException("Неизвестный столбец: " + column);
+                throw new IllegalArgumentException("Unknown column: " + column);
             }
 
             if (!normalizedColumns.add(normalized)) {
-                throw new IllegalArgumentException("Столбец указан несколько раз: " + column);
+                throw new IllegalArgumentException("The column is specified multiple times: " + column);
             }
         }
 
@@ -90,7 +89,7 @@ public class QueryExecutor {
             }
 
             if (table.equalsIgnoreCase("Authors")) {
-                Author author = new Author(integer(row, "id"), required(row, "name"), LocalDate.parse(required(row, "birthdate")), bool(row, "alive"));
+                Author author = new Author(integer(row, "id"), required(row, "name"), parseBirthDate(required(row, "birthdate")), bool(row, "alive"));
                 db.insertAuthor(author);
             } else {
                 Book book = new Book(integer(row, "id"), required(row, "title"), integer(row, "authorid"), decimal(row, "price"), LocalDate.parse(required(row, "publishdate")), bool(row, "available"));
@@ -232,7 +231,7 @@ public class QueryExecutor {
         if (table.equalsIgnoreCase("Authors")) {
             for (Author a : new ArrayList<>(db.getAuthors().values())) {
                 if (!matchesAuthor(a, condition)) continue;
-                Author updated = new Author(a.getId(), changes.getOrDefault("name", a.getName()), LocalDate.parse(changes.getOrDefault("birthdate", "" + a.getBirthDate())), Boolean.parseBoolean(changes.getOrDefault("alive", "" + a.isAlive())));
+                Author updated = new Author(a.getId(), changes.getOrDefault("name", a.getName()), parseBirthDate(changes.getOrDefault("birthdate", "" + a.getBirthDate())), Boolean.parseBoolean(changes.getOrDefault("alive", "" + a.isAlive())));
                 db.updateAuthor(a, updated);
                 count++;
             }
@@ -312,6 +311,31 @@ public class QueryExecutor {
         return Integer.parseInt(required(row, key));
     }
 
+    /**
+     * Validates and converts a string into a date of birth.
+     * @param value the string representation of the date
+     * @return a valid date of birth
+     * @throws IllegalArgumentException if the date is invalid
+     * or null
+     */
+    private LocalDate parseBirthDate(String value) {
+        if (value == null || value.isBlank() || value.equals("0000-00-00")) {
+            throw new IllegalArgumentException("The date of birth cannot be zero or empty.");
+        }
+
+        try {
+            LocalDate date = LocalDate.parse(value);
+            if (date.getYear() < 1) {
+                throw new IllegalArgumentException("The year of birth must be greater than zero.");
+            }
+
+            return date;
+
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("Invalid date of birth: " + value + ". Use the YYYY-MM-DD format.");
+        }
+    }
+
     private double decimal(Map<String, String> row, String key) {
         return Double.parseDouble(required(row, key));
     }
@@ -370,7 +394,7 @@ public class QueryExecutor {
 
     private String removeTrailingSemicolons(String sql) {
         if (sql == null) {
-            throw new IllegalArgumentException("Команда не может быть null.");
+            throw new IllegalArgumentException("The team cannot be null.");
         }
         String result = sql.trim();
         while (result.endsWith(";")) {
@@ -462,5 +486,4 @@ public class QueryExecutor {
             throw new IllegalArgumentException("Unknown table: " + table);
         }
     }
-
 }
