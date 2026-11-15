@@ -7,7 +7,13 @@ import library.instrumentsForQuery.QueryExecutor;
 import java.nio.file.Path;
 import java.util.Scanner;
 
+/**
+ * Main class.
+ */
 public class Main {
+    /**
+     * Launches the console interface.
+     */
     public static void main(String[] args) {
         Path dataDirectory = Path.of("data");
         Database database = new Database(dataDirectory);
@@ -68,7 +74,9 @@ public class Main {
         String firstWord = line.substring(0, end).toUpperCase(java.util.Locale.ROOT);
         return firstWord.equals("INSERT") || firstWord.equals("SELECT") || firstWord.equals("UPDATE") || firstWord.equals("DELETE") || firstWord.equals("CREATE");
     }
-
+    /**
+     * Displays help for SQL commands.
+     */
     private static void printHelp() {
         System.out.println("""
         Examples of SQL commands
