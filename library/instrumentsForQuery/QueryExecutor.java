@@ -11,6 +11,7 @@ import java.util.regex.Matcher;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Set;
@@ -24,10 +25,9 @@ public class QueryExecutor {
     }
 
     public void execute(String sql) {
-        String command = sql.trim().replaceAll(";+$", "").trim();
+        String command = removeTrailingSemicolons(sql);
         if (command.isEmpty()) return;
         String upper = command.toUpperCase(Locale.ROOT);
-
         if (upper.startsWith("INSERT INTO ")) {
             insert(command);
         } else if (upper.startsWith("SELECT ")) {
@@ -44,17 +44,42 @@ public class QueryExecutor {
     }
 
     private void insert(String sql) {
-        final Pattern INSERT_PATTERN = Pattern.compile("\\s*" + "INSERT" + "\\s*" + "INTO" + "\\s*" + "(?<table>Authors|Books)" + "\\s*" + "(?:\\((?<columns> .*? )\\))?" + "\\s*" + "VALUES" + "\\s*" + "(?<values>.+)" + "\\s*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-        Matcher m = INSERT_PATTERN.matcher(sql);
-        if (!m.matches()) {
-            throw new IllegalArgumentException("Invalid format INSERT.");
+        String body = removePrefix(sql, "INSERT INTO");
+        String table = readWord(body);
+        body = body.substring(table.length()).trim();
+        List<String> explicitColumns = null;
+        if (body.startsWith("(")) {
+            int closing = findClosingParenthesis(body, 0);
+            explicitColumns = parser.splitComma(body.substring(1, closing));
+            body = body.substring(closing + 1).trim();
         }
 
-        String table = m.group(1);
-        List<String> columns = m.group(2) == null ? defaults(table) : parser.splitComma(m.group(2));
-        List<String> tuples = extractTuples(m.group(3));
-        for (String tuple : tuples) {
-            List<String> values = parser.splitComma(tuple);
+        body = removePrefix(body, "VALUES");
+        if (body.isBlank()) {
+            throw new IllegalArgumentException("После VALUES не указаны значения.");
+        }
+
+        if (!table.equalsIgnoreCase("Authors") && !table.equalsIgnoreCase("Books")) {
+            throw new IllegalArgumentException("Неизвестная таблица: " + table);
+        }
+
+        Set<String> allowedColumns = table.equalsIgnoreCase("Authors") ? Set.of("id", "name", "birthdate", "alive") : Set.of("id", "title", "authorid", "price", "publishdate", "available");
+        List<String> columns = explicitColumns == null ? defaults(table) : explicitColumns;
+        Set<String> normalizedColumns = new HashSet<>();
+        for (String column : columns) {
+            String normalized = column.trim().toLowerCase(Locale.ROOT);
+            if (!allowedColumns.contains(normalized)) {
+                throw new IllegalArgumentException("Неизвестный столбец: " + column);
+            }
+
+            if (!normalizedColumns.add(normalized)) {
+                throw new IllegalArgumentException("Столбец указан несколько раз: " + column);
+            }
+        }
+
+        List<String> tuples = extractTuples(body);
+        for (String t : tuples) {
+            List<String> values = parser.splitComma(t);
             if (columns.size() != values.size()) {
                 throw new IllegalArgumentException("The number of fields does not match.");
             }
@@ -120,14 +145,18 @@ public class QueryExecutor {
     }
 
     private void select(String sql) {
-        final Pattern SELECT_PATTERN = Pattern.compile("\\s*" + "SELECT" + "\\s*" + "FROM" + "\\s*" + "(?<table>Authors|Books)" + "(?:\\s+WHERE\\s+(?<condition>.+))?" + "\\s*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-        Matcher m = SELECT_PATTERN.matcher(sql);
-        if (!m.matches()) {
-            throw new IllegalArgumentException("Format: SELECT * FROM Books WHERE id = 1;");
+        String body = removePrefix(sql, "SELECT").trim();
+        body = removePrefix(body, "*");
+        body = removePrefix(body, "FROM");
+        String table = readWord(body);
+        body = body.substring(table.length()).trim();
+        String whereText = takeOptionalWhere(body);
+        if (!body.isBlank() && whereText == null) {
+            throw new IllegalArgumentException("Unknown part SELECT: " + body);
         }
 
-        String table = m.group(1);
-        Condition condition = m.group(2) == null ? null : parser.parseCondition(m.group(2));
+        validateTable(table);
+        Condition condition = whereText == null ? null : parser.parseCondition(whereText);
         if (table.equalsIgnoreCase("Authors")) {
             List<Author> rows = filterAuthors(condition);
             print(List.of("id", "name", "birthDate", "alive"), rows.stream().map(a -> List.of("" + a.getId(), a.getName(), "" + a.getBirthDate(), "" + a.isAlive())).toList());
@@ -142,7 +171,7 @@ public class QueryExecutor {
         if (c != null && c.operator().equals("=") && db.getIndexes().hasIndex("authors", c.column())) {
             Set<Integer> ids = db.getIndexes().find("authors", c.column(), c.value());
             source = ids.stream().map(db.getAuthors()::get).filter(Objects::nonNull).toList();
-            System.out.println("Использован индекс Authors." + c.column());
+            System.out.println("Index used Authors." + c.column());
         }
 
         List<Author> result = new ArrayList<>();
@@ -160,7 +189,7 @@ public class QueryExecutor {
         if (c != null && c.operator().equals("=") && db.getIndexes().hasIndex("books", c.column())) {
             Set<Integer> ids = db.getIndexes().find("books", c.column(), c.value());
             source = ids.stream().map(db.getBooks()::get).filter(Objects::nonNull).toList();
-            System.out.println("Использован индекс books." + c.column());
+            System.out.println("Index used Books." + c.column());
         }
 
         List<Book> result = new ArrayList<>();
@@ -174,15 +203,16 @@ public class QueryExecutor {
     }
 
     private void update(String sql) {
-        final Pattern UPDATE_PATTERN = Pattern.compile("\\s*" + "UPDATE" + "\\s*" + "(?<table>Authors|Books)" + "\\s*" + "SET" + "\\s*" + "(?<set>.+?)" + "(?:\\s+WHERE\\s+(?<condition>.+))?" + "\\s*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-        Matcher m = UPDATE_PATTERN.matcher(sql);
-        if (!m.matches()) {
-            throw new IllegalArgumentException("Invalid format UPDATE.");
-        }
-
-        String table = m.group(1);
+        String body = removePrefix(sql, "UPDATE");
+        String table = readWord(body);
+        body = body.substring(table.length()).trim();
+        body = removePrefix(body, "SET");
+        String whereText = takeOptionalWhere(body);
+        String assignments = whereText == null ? body : body.substring(0, findKeywordOutsideQuotes(body, "WHERE")).trim();
+        validateTable(table);
+        Set<String> allowedColumns = table.equalsIgnoreCase("Authors") ? Set.of("name", "birthdate", "alive") : Set.of("title", "authorid", "price", "publishdate", "available");
         Map<String, String> changes = new HashMap<>();
-        for (String assignment : parser.splitComma(m.group(2))) {
+        for (String assignment : parser.splitComma(assignments)) {
             String[] pair = assignment.split("=", 2);
             if (pair.length != 2) {
                 throw new IllegalArgumentException("Incorrect assignment: " + assignment);
@@ -191,7 +221,13 @@ public class QueryExecutor {
             changes.put(pair[0].trim().toLowerCase(Locale.ROOT), parser.unquote(pair[1]));
         }
 
-        Condition condition = m.group(3) == null ? null : parser.parseCondition(m.group(3));
+        for (String c : changes.keySet()) {
+            if (!allowedColumns.contains(c)) {
+                throw new IllegalArgumentException("Modifying an unknown or immutable column is not permitted.: " + c);
+            }
+        }
+
+        Condition condition = whereText == null ? null : parser.parseCondition(whereText);
         int count = 0;
         if (table.equalsIgnoreCase("Authors")) {
             for (Author a : new ArrayList<>(db.getAuthors().values())) {
@@ -213,14 +249,17 @@ public class QueryExecutor {
     }
 
     private void delete(String sql) {
-        final Pattern DELETE_PATTERN = Pattern.compile("\\s*" + "DELETE" + "\\s*" + "FROM" + "\\s*" + "(?<table>Authors|Books)" + "(?:\\s+WHERE\\s+(?<condition>.+))?" + "\\s*", Pattern.CASE_INSENSITIVE | Pattern.DOTALL);
-        Matcher m = DELETE_PATTERN.matcher(sql);
-        if (!m.matches()) {
-            throw new IllegalArgumentException("Invalid format DELETE.");
+        String body = removePrefix(sql, "DELETE");
+        body = removePrefix(body, "FROM");
+        String table = readWord(body);
+        body = body.substring(table.length()).trim();
+        String whereText = takeOptionalWhere(body);
+        if (!body.isBlank() && whereText == null) {
+            throw new IllegalArgumentException("Unknown part DELETE: " + body);
         }
 
-        String table = m.group(1);
-        Condition condition = m.group(2) == null ? null : parser.parseCondition(m.group(2));
+        validateTable(table);
+        Condition condition = whereText == null ? null : parser.parseCondition(whereText);
         int count = 0;
         if (table.equalsIgnoreCase("Authors")) {
             List<Integer> ids = db.getAuthors().values().stream().filter(a -> matchesAuthor(a, condition)).map(Author::getId).toList();
@@ -240,13 +279,24 @@ public class QueryExecutor {
     }
 
     private void createIndex(String sql) {
-        final Pattern INDEX_PATTERN = Pattern.compile("\\s*" + "CREATE" + "\\s*" + "INDEX" + "\\s*" + "(?<indexName>\\w+)" + "\\s*" + "ON" + "\\s*" + "(?<table>Authors|Books)" + "\\s*" + "\\(\\s*(?<column>\\w+)\\s*\\)" + "\\s*", Pattern.CASE_INSENSITIVE);
-        Matcher m = INDEX_PATTERN.matcher(sql);
-        if (!m.matches()) {
+        String body = removePrefix(sql, "CREATE");
+        body = removePrefix(body, "INDEX");
+        String indexName = readWord(body);
+        body = body.substring(indexName.length()).trim();
+        body = removePrefix(body, "ON");
+        String table = readWord(body);
+        body = body.substring(table.length()).trim();
+        if (!body.startsWith("(") || !body.endsWith(")")) {
             throw new IllegalArgumentException("Format: CREATE INDEX idx ON Books(title);");
         }
 
-        db.createIndex(m.group(1), m.group(2), m.group(3));
+        String column = body.substring(1, body.length() - 1).trim();
+        if (column.isBlank() || column.contains(",") || column.contains(" ")) {
+            throw new IllegalArgumentException("Specify one valid index column.");
+        }
+
+        validateTable(table);
+        db.createIndex(indexName, table, column);
         System.out.println("The index has been created and saved.");
     }
 
@@ -317,4 +367,100 @@ public class QueryExecutor {
         }
         System.out.println(line);
     }
+
+    private String removeTrailingSemicolons(String sql) {
+        if (sql == null) {
+            throw new IllegalArgumentException("Команда не может быть null.");
+        }
+        String result = sql.trim();
+        while (result.endsWith(";")) {
+            result = result.substring(0, result.length() - 1).trim();
+        }
+        return result;
+    }
+
+    private String removePrefix(String text, String keyword) {
+        String value = text.trim();
+        if (!value.regionMatches(true, 0, keyword, 0, keyword.length())) {
+            throw new IllegalArgumentException("Keyword expected " + keyword);
+        }
+
+        if (value.length() > keyword.length() && !Character.isWhitespace(value.charAt(keyword.length())) && value.charAt(keyword.length()) != '*' && value.charAt(keyword.length()) != '(') {
+            throw new IllegalArgumentException("Invalid keyword " + keyword);
+        }
+
+        return value.substring(keyword.length()).trim();
+    }
+
+    private String readWord(String text) {
+        String value = text.trim();
+        int end = 0;
+        while (end < value.length() && !Character.isWhitespace(value.charAt(end)) && value.charAt(end) != '(') {
+            end++;
+        }
+
+        if (end == 0) {
+            throw new IllegalArgumentException("Table or index name not specified.");
+        }
+
+        return value.substring(0, end);
+    }
+
+    private String takeOptionalWhere(String text) {
+        int wherePosition = findKeywordOutsideQuotes(text, "WHERE");
+        if (wherePosition < 0) return null;
+        return text.substring(wherePosition + "WHERE".length()).trim();
+    }
+
+    private int findKeywordOutsideQuotes(String text, String keyword) {
+        boolean quoted = false;
+        for (int i = 0; i <= text.length() - keyword.length(); i++) {
+            char current = text.charAt(i);
+            if (current == '\'') {
+                if (quoted && i + 1 < text.length() && text.charAt(i + 1) == '\'') {
+                    i++;
+                    continue;
+                }
+
+                quoted = !quoted;
+                continue;
+            }
+
+            if (!quoted && text.regionMatches(true, i, keyword, 0, keyword.length())) {
+                boolean leftBoundary = i == 0 || Character.isWhitespace(text.charAt(i - 1));
+                int after = i + keyword.length();
+                boolean rightBoundary = after == text.length() || Character.isWhitespace(text.charAt(after));
+                if (leftBoundary && rightBoundary) return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private int findClosingParenthesis(String text, int openingPosition) {
+        boolean quoted = false;
+        int depth = 0;
+        for (int i = openingPosition; i < text.length(); i++) {
+            char current = text.charAt(i);
+            if (current == '\'') {
+                if (quoted && i + 1 < text.length() && text.charAt(i + 1) == '\'') {
+                    i++;
+                    continue;
+                }
+                quoted = !quoted;
+            } else if (!quoted) {
+                if (current == '(') depth++;
+                if (current == ')' && --depth == 0) return i;
+            }
+        }
+
+        throw new IllegalArgumentException("Closing parenthesis not found.");
+    }
+
+    private void validateTable(String table) {
+        if (!table.equalsIgnoreCase("Authors") && !table.equalsIgnoreCase("Books")) {
+            throw new IllegalArgumentException("Unknown table: " + table);
+        }
+    }
+
 }
