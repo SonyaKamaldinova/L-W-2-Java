@@ -6,24 +6,24 @@ import library.classes.Book;
 import java.util.Collection;
 
 public class BooksTable {
-    private final Database database;
+    private final Database db;
     public BooksTable(Database database) {
-        this.database = database;
+        this.db = database;
     }
 
     public Collection<Book> findAll() {
-        return database.getBooks().values();
+        return db.getBooks().values();
     }
 
     public Book findById(int id) {
-        return database.getBooks().get(id);
+        return db.getBooks().get(id);
     }
 
     public void insert(Book book) {
-        database.insertBook(book);
+        db.insertBook(book);
     }
 
     public void delete(int id) {
-        database.deleteBook(id);
+        db.deleteBook(id);
     }
 }
