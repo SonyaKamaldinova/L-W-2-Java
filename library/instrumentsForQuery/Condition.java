@@ -1,9 +1,17 @@
 package library.instrumentsForQuery;
 
+/**
+ * A condition for comparing a column value with an SQL literal.
+ * @param column   the column name
+ * @param operator the comparison operator
+ * @param value    the value to compare against
+ */
 public record Condition(String column, String operator, String value) {
+    /**
+     * Checks whether the value satisfies the condition.
+     */
     public boolean test(String actual) {
         int comparison;
-
         try {
             comparison = Double.compare(Double.parseDouble(actual), Double.parseDouble(value));
         } catch (NumberFormatException e) {
