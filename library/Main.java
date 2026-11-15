@@ -38,6 +38,10 @@ public class Main {
                 if (line.isEmpty()) {
                     continue;
                 }
+                if (buffer.isEmpty() && !isSupportedCommandStart(line)) {
+                    System.out.println("Error: unknown command. Enter HELP to view available commands.");
+                    continue;
+                }
                 buffer.append(line).append(" ");
                 if (!line.endsWith(";")) {
                     continue;
@@ -53,6 +57,16 @@ public class Main {
         database.saveAll();
         System.out.println("Data saved.");
         System.out.println("Program execution has finished.");
+    }
+
+    private static boolean isSupportedCommandStart(String line) {
+        int end = 0;
+        while (end < line.length() && !Character.isWhitespace(line.charAt(end))) {
+            end++;
+        }
+
+        String firstWord = line.substring(0, end).toUpperCase(java.util.Locale.ROOT);
+        return firstWord.equals("INSERT") || firstWord.equals("SELECT") || firstWord.equals("UPDATE") || firstWord.equals("DELETE") || firstWord.equals("CREATE");
     }
 
     private static void printHelp() {
