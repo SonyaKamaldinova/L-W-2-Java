@@ -12,8 +12,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
-
+/**
+ * A serializer that converts tables into human-readable CSV files.
+ * Writing is performed via a temporary file, which then replaces the original.
+ */
 public class SaveManager {
+    /**
+     * Loads authors from a CSV file.
+     * @throws IOException in case of a format or reading error.
+     */
     public List<Author> loadAuthors(Path file) throws IOException {
         List<Author> authors = new ArrayList<>();
         if (!Files.exists(file)) {
@@ -37,7 +44,10 @@ public class SaveManager {
 
         return authors;
     }
-
+    /**
+     * Loads books from a CSV file.
+     * @throws IOException if a format or reading error occurs.
+     */
     public List<Book> loadBooks(Path file) throws IOException {
         List<Book> books = new ArrayList<>();
         if (!Files.exists(file)) {
@@ -61,7 +71,10 @@ public class SaveManager {
 
         return books;
     }
-
+    /**
+     * Saves authors to a CSV file.
+     * @throws IOException if an error occurs during writing.
+     */
     public void saveAuthors(Path file, Iterable<Author> authors) throws IOException {
         List<String> lines = new ArrayList<>();
         lines.add("id, name, birthDate, alive");
@@ -71,7 +84,10 @@ public class SaveManager {
 
         writeAtomically(file, lines);
     }
-
+    /**
+     * Saves books to CSV.
+     * @throws IOException if a writing error occurs.
+     */
     public void saveBooks(Path file, Iterable<Book> books) throws IOException {
         List<String> lines = new ArrayList<>();
         lines.add("id, title, authorId, price, publishDate, available");
@@ -81,7 +97,10 @@ public class SaveManager {
 
         writeAtomically(file, lines);
     }
-
+    /**
+     * Loads the list of indexed columns.
+     * @throws IOException if a reading error occurs.
+     */
     public Set<String> loadIndexedColumns(Path file) throws IOException {
         Set<String> columns = new TreeSet<>();
         if (!Files.exists(file)) {
@@ -97,7 +116,10 @@ public class SaveManager {
 
         return columns;
     }
-
+    /**
+     * Saves the list of indexed columns.
+     * @throws IOException if a write error occurs.
+     */
     public void saveIndexedColumns(Path file, Set<String> columns) throws IOException {
         List<String> lines = new ArrayList<>();
         lines.add("table.column");
