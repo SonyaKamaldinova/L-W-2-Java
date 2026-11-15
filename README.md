@@ -52,7 +52,7 @@ CREATE INDEX idx_books_author ON Books(authorId);
 ```mermaid
 classDiagram
     class Author{
-      -int id {readOnly}
+      -int id ~readOnly~
       -String name
       -LocalDate birthDate
       -boolean alive
@@ -66,7 +66,7 @@ classDiagram
       +toString() String
     }
     class Book {
-      -int id {readOnly}
+      -int id ~readOnly~
       -String title
       -int authorId
       -double price
@@ -91,23 +91,23 @@ classDiagram
       +save(Path, Iterable~T~) void
     }
     class AuthorsTableDao {
-      -SaveManager storage {readOnly}
+      -SaveManager storage ~readOnly~
       +load(Path) List~Author~
       +save(Path, Iterable~Author~) void
     }
     class BooksTableDao {
-      -SaveManager storage {readOnly}
+      -SaveManager storage ~readOnly~
       +load(Path) List~Book~
       +save(Path, Iterable~Book~) void
     }
     class Database {
-      -SaveManager storage {readOnly}
-      -TableDao~Author~ authorDao {readOnly}
-      -TableDao~Book~ bookDao {readOnly}
-      -Path dataDirectory {readOnly}
-      -Path authorsFile {readOnly}
-      -Path booksFile {readOnly}
-      -Path indexesFile {readOnly}
+      -SaveManager storage ~readOnly~
+      -TableDao~Author~ authorDao ~readOnly~
+      -TableDao~Book~ bookDao ~readOnly~
+      -Path dataDirectory ~readOnly~
+      -Path authorsFile ~readOnly~
+      -Path booksFile ~readOnly~
+      -Path indexesFile ~readOnly~
       -Map~Integer, Author~ authors
       -Map~Integer, Book~ books
       -IndexManager indexes
@@ -128,7 +128,7 @@ classDiagram
       +createIndex(String, String, String) void 
     }
     class AuthorsTable {
-      -Database db {readOnly}
+      -Database db ~readOnly~
       +findAll() Collection~Author~
       +findById(int) Author
       +insert(Author) void
@@ -136,7 +136,7 @@ classDiagram
       +iterator() Iterator~Author~
     }
     class BooksTable {
-      -Database db {readOnly}
+      -Database db ~readOnly~
       +findAll() Collection~Book~
       +findById(int) Book
       +insert(Book) void
@@ -144,7 +144,7 @@ classDiagram
       +iterator() Iterator~Book~
     }
     class RecordIterator~T~ {
-    -List<T> snapshot {readOnly}
+    -List<T> snapshot ~readOnly~
     -int position
     +hasNext() boolean 
     +next() T
