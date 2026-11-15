@@ -16,13 +16,25 @@ import java.util.Collection;
 import java.util.Set;
 import java.util.Objects;
 
+/**
+ * Executes SQL-like queries.
+ */
 public class QueryExecutor {
     private final Database db;
     private final SQLParser parser = new SQLParser();
+    /**
+     * Creates an SQL command executor for the specified database.
+     */
     public QueryExecutor(Database db) {
         this.db = db;
     }
-
+    /**
+     * Determines the command type and invokes the corresponding method.
+     */
+    /**
+     * Executes a single SQL-like command.
+     * @throws IllegalArgumentException if the command is invalid.
+     */
     public void execute(String sql) {
         String command = removeTrailingSemicolons(sql);
         if (command.isEmpty()) return;
@@ -107,7 +119,9 @@ public class QueryExecutor {
 
         return List.of("id", "title", "authorId", "price", "publishDate", "available");
     }
-
+    /**
+     * Extracts groups of VALUES.
+     */
     private List<String> extractTuples(String input) {
         List<String> result = new ArrayList<>();
         boolean quoted = false;
@@ -357,7 +371,9 @@ public class QueryExecutor {
 
         return v;
     }
-
+    /**
+     * Outputs a table to the console.
+     */
     private void print(List<String> headers, List<List<String>> rows) {
         List<Integer> widths = new ArrayList<>();
         for (int i = 0; i < headers.size(); i++) {
