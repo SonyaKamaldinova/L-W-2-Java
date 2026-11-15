@@ -66,7 +66,7 @@ public class SaveManager {
         List<String> lines = new ArrayList<>();
         lines.add("id, name, birthDate, alive");
         for (Author a : authors) {
-            lines.add(String.join(", ", csv(String.valueOf(a.getId())), csv(a.getName()), csv(a.getBirthDate().toString()), csv(String.valueOf(a.isAlive()))));
+            lines.add(String.join(",", csv(String.valueOf(a.getId())), csv(a.getName()), csv(a.getBirthDate().toString()), csv(String.valueOf(a.isAlive()))));
         }
 
         writeAtomically(file, lines);
@@ -76,7 +76,7 @@ public class SaveManager {
         List<String> lines = new ArrayList<>();
         lines.add("id, title, authorId, price, publishDate, available");
         for (Book b : books) {
-            lines.add(String.join(", ", csv(String.valueOf(b.getId())), csv(b.getTitle()), csv(String.valueOf(b.getAuthorId())), csv(String.valueOf(b.getPrice())), csv(b.getPublishDate().toString()), csv(String.valueOf(b.isAvailable()))));
+            lines.add(String.join(",", csv(String.valueOf(b.getId())), csv(b.getTitle()), csv(String.valueOf(b.getAuthorId())), csv(String.valueOf(b.getPrice())), csv(b.getPublishDate().toString()), csv(String.valueOf(b.isAvailable()))));
         }
 
         writeAtomically(file, lines);
