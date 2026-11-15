@@ -1,5 +1,8 @@
 package library;
 
+import library.dao.AuthorsTableDao;
+import library.dao.BooksTableDao;
+import library.dao.TableDao;
 import library.IndexManager;
 import library.classes.Author;
 import library.classes.Book;
@@ -8,44 +11,50 @@ import library.SaveManager;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Coordinates tables, relationship constraints, indexes, and data persistence.
+ * Uses DAOs to decouple database logic from the storage format.
+ */
 public class Database {
     private final SaveManager storage = new SaveManager();
+    private final TableDao<Author> authorDao = new AuthorsTableDao(storage);
+    private final TableDao<Book> bookDao = new BooksTableDao(storage);
     private final Path dataDirectory;
     private final Path authorsFile;
     private final Path booksFile;
     private final Path indexesFile;
-    private Map<Integer, Author> authors;
-    private Map<Integer, Book> books;
-    private IndexManager indexes;
-
+    private Map<Integer, Author> authors = new HashMap<>();
+    private Map<Integer, Book> books = new HashMap<>();
+    private IndexManager indexes = new IndexManager();
+    /**
+     * Opens the database from the specified folder and rebuilds the indexes.
+     */
     public Database(Path dataDirectory) {
         this.dataDirectory = dataDirectory;
         this.authorsFile = dataDirectory.resolve("authors.csv");
         this.booksFile = dataDirectory.resolve("books.csv");
         this.indexesFile = dataDirectory.resolve("indexes.csv");
-        this.authors = new HashMap<>();
-        this.books = new HashMap<>();
-        this.indexes = new IndexManager();
 
         try {
             Files.createDirectories(dataDirectory);
-            for (Author author : storage.loadAuthors(authorsFile)) {
-                if (authors.putIfAbsent(author.getId(), author) != null) {
-                    throw new IOException("Author ID is repeated: " + author.getId());
+            for (Author a : authorDao.load(authorsFile)) {
+                if (authors.putIfAbsent(a.getId(), a) != null) {
+                    throw new IOException("Author ID is repeated: " + a.getId());
                 }
             }
 
-            for (Book book : storage.loadBooks(booksFile)) {
-                if (books.putIfAbsent(book.getId(), book) != null) {
-                    throw new IOException("Book ID is repeated: " + book.getId());
+            for (Book b : bookDao.load(booksFile)) {
+                if (books.putIfAbsent(b.getId(), b) != null) {
+                    throw new IOException("Book ID is repeated: " + b.getId());
                 }
 
-                if (!authors.containsKey(book.getAuthorId())) {
-                    throw new IOException("For a book with ID " + book.getId() + " author with ID not found " + book.getAuthorId());
+                if (!authors.containsKey(b.getAuthorId())) {
+                    throw new IOException("For a book with ID " + b.getId() + " author with ID not found " + b.getAuthorId());
                 }
             }
 
@@ -71,26 +80,34 @@ public class Database {
                     rebuilt.createIndex("restored_" + column, "books", column, books.keySet(), id -> bookValue(books.get(id), column));
                 }
             } catch (RuntimeException e) {
-                System.err.println("Не удалось восстановить индекс: " + fullName);
+                System.err.println("Failed to restore the index: " + fullName);
             }
         }
 
         indexes = rebuilt;
         saveAll();
     }
-
+    /**
+     * @return an unmodifiable view of the authors table
+     */
     public Map<Integer, Author> getAuthors() {
-        return authors;
+        return Collections.unmodifiableMap(authors);
     }
-
+    /**
+     * @return an unmodifiable view of the table of books
+     */
     public Map<Integer, Book> getBooks() {
-        return books;
+        return Collections.unmodifiableMap(books);
     }
-
+    /**
+     * @return a manager for executing indexed queries
+     */
     public IndexManager getIndexes() {
         return indexes;
     }
-
+    /**
+     * Adds an author, checking for the uniqueness of the primary key.
+     */
     public void insertAuthor(Author author) {
         if (authors.containsKey(author.getId())) {
             throw new IllegalArgumentException("An author with this ID already exists.");
@@ -100,7 +117,9 @@ public class Database {
         updateIndexes("authors", author.getId(), null, author);
         saveAll();
     }
-
+    /**
+     * Adds a book, verifying the uniqueness of the ID and the validity of the author's foreign key.
+     */
     public void insertBook(Book book) {
         if (books.containsKey(book.getId())) {
             throw new IllegalArgumentException("A book with this ID already exists.");
@@ -114,12 +133,14 @@ public class Database {
         updateIndexes("books", book.getId(), null, book);
         saveAll();
     }
-
+    /**
+     * Saves tables and index descriptions to CSV.
+     */
     public void saveAll() {
         try {
             Files.createDirectories(dataDirectory);
-            storage.saveAuthors(authorsFile, authors.values());
-            storage.saveBooks(booksFile, books.values());
+            authorDao.save(authorsFile, authors.values());
+            bookDao.save(booksFile, books.values());
             storage.saveIndexedColumns(indexesFile, indexes.indexedColumns());
         } catch (IOException e) {
             throw new IllegalStateException("Failed to save data", e);
@@ -139,7 +160,9 @@ public class Database {
             createIndex("restored_" + table + "_" + column, table, column);
         }
     }
-
+    /**
+     * Retrieves the value of the author column by column name.
+     */
     public String authorValue(Author a, String column) {
         switch (column.toLowerCase()) {
             case "id":
@@ -154,7 +177,9 @@ public class Database {
                 throw new IllegalArgumentException("Unknown column Authors: " + column);
         }
     }
-
+    /**
+     * Retrieves the value of a workbook column by its name.
+     */
     public String bookValue(Book b, String column) {
         switch (column.toLowerCase()) {
             case "id":
@@ -200,13 +225,17 @@ public class Database {
             }
         }
     }
-
+    /**
+     * Updates the author, with synchronous index updates.
+     */
     public void updateAuthor(Author old, Author updated) {
         authors.put(old.getId(), updated);
         updateIndexes("authors", old.getId(), old, updated);
         saveAll();
     }
-
+    /**
+     * Updates the book and checks the reference to an existing author.
+     */
     public void updateBook(Book old, Book updated) {
         if (!authors.containsKey(updated.getAuthorId())) {
             throw new IllegalArgumentException("The specified author does not exist.");
@@ -216,7 +245,9 @@ public class Database {
         updateIndexes("books", old.getId(), old, updated);
         saveAll();
     }
-
+    /**
+     * Deletes an author if no books reference them.
+     */
     public void deleteAuthor(int id) {
         boolean used = books.values().stream().anyMatch(b -> b.getAuthorId() == id);
         if (used) {
@@ -230,7 +261,9 @@ public class Database {
 
         saveAll();
     }
-
+    /**
+     * Removes a book and updates the indices.
+     */
     public void deleteBook(int id) {
         Book removed = books.remove(id);
         if (removed != null) {
@@ -239,7 +272,9 @@ public class Database {
 
         saveAll();
     }
-
+    /**
+     * Creates an index for an existing table column.
+     */
     public void createIndex(String name, String table, String column) {
         if (table.equalsIgnoreCase("authors")) {
             indexes.createIndex(name, "authors", column, authors.keySet(), id -> authorValue(authors.get(id), column));
