@@ -8,8 +8,7 @@ public class Author{
     private LocalDate birthDate;
     private boolean alive;
 
-    public Author(int id, String name,
-                  LocalDate birthDate, boolean alive) {
+    public Author(int id, String name, LocalDate birthDate, boolean alive) {
         this.id = id;
         this.name = name;
         this.birthDate = birthDate;
@@ -46,6 +45,6 @@ public class Author{
 
     @Override
     public String toString() {
-        return id + " | " + name + " | " + birthDate + " | " + alive;
+        return id + "  " + name + "  " + birthDate + "  " + alive;
     }
 }
