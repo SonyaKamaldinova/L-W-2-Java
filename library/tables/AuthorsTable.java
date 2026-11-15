@@ -12,7 +12,7 @@ import java.util.Iterator;
  * A table for read and modification operations on Author entities.
  * It encapsulates access to the table and provides an iterator over the records.
  */
-public class AuthorsTable implements Iterable<Author> {
+public final class AuthorsTable implements Iterable<Author> {
     private final Database db;
     /**
      * Creates a table associated with a database.
