@@ -5,8 +5,14 @@ import java.util.ArrayList;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
+/**
+ * A parser for SQL-like commands.
+ */
 public class SQLParser {
     private static final Pattern CONDITION_PATTERN = Pattern.compile("\\s*" + "(?<column>\\w+)" + "\\s*" +"(?<operator>=|!=|<>|>=|<=|>|<)" + "\\s*" +"(?<value>.+?)" + "\\s*", Pattern.DOTALL);
+    /**
+     * Parses the WHERE clause.
+     */
     public Condition parseCondition(String text) {
         Matcher matcher = CONDITION_PATTERN.matcher(text);
         if (!matcher.matches()) {
@@ -15,7 +21,10 @@ public class SQLParser {
 
         return new Condition(matcher.group(1), matcher.group(2), unquote(matcher.group(3)));
     }
-
+    /**
+     * Splits a string by commas,
+     * without splitting values enclosed in quotation marks.
+     */
     public List<String> splitComma(String input) {
         List<String> result = new ArrayList<>();
         StringBuilder current = new StringBuilder();
@@ -44,7 +53,9 @@ public class SQLParser {
 
         return result;
     }
-
+    /**
+     * Removes the quotation marks around a string value.
+     */
     public String unquote(String value) {
         String result = value.trim();
         if (result.endsWith(";")) {
