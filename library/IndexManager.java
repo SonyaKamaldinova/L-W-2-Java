@@ -18,11 +18,11 @@ public class IndexManager {
     public void createIndex(String name, String table, String column, Collection<Integer> ids, java.util.function.IntFunction<String> getter) {
         String key = key(table, column);
         if (indexes.containsKey(key)) {
-            throw new IllegalArgumentException("Индекс для этого столбца уже существует.");
+            throw new IllegalArgumentException("An index for this column already exists.");
         }
 
         if (indexNames.containsValue(name)) {
-            throw new IllegalArgumentException("Имя индекса уже используется.");
+            throw new IllegalArgumentException("The index name is already in use.");
         }
 
         Map<String, Set<Integer>> index = new HashMap<>();
@@ -45,7 +45,6 @@ public class IndexManager {
 
     public Set<Integer> find(String table, String column, String value) {
         Map<String, Set<Integer>> index = indexes.get(key(table, column));
-
         if (index == null) {
             return null;
         }
@@ -55,7 +54,6 @@ public class IndexManager {
 
     public void add(String table, String column, String value, int id) {
         Map<String, Set<Integer>> index = indexes.get(key(table, column));
-
         if (index != null) {
             index.putIfAbsent(value, new HashSet<>());
             index.get(value).add(id);
@@ -64,7 +62,6 @@ public class IndexManager {
 
     public void remove(String table, String column, String value, int id) {
         Map<String, Set<Integer>> index = indexes.get(key(table, column));
-
         if (index == null) return;
         Set<Integer> ids = index.get(value);
         if (ids != null) {
