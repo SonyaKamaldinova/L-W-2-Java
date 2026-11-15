@@ -2,9 +2,11 @@
 
 ## Запуск
 
+- java -version
+
 - cd путь/к/папке_с_проектом
 
-- javac -encoding UTF-8 -sourcepath src -d out src/library/Main.java
+- javac -d out library/Main.java 
 
 - java -cp out library.Main
 
