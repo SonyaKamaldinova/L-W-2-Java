@@ -6,15 +6,20 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Collection;
 import java.util.Collections;
-
-public class IndexManager {
+/**
+ * Manages table hash indices. Value keys are normalized,
+ * so string lookups are case-insensitive, and numeric lookups are independent of representation (e.g., 1 vs. 1.0).
+ */
+public final class IndexManager {
     private final Map<String, Map<String, Set<Integer>>> indexes = new HashMap<>();
     private final Map<String, String> indexNames = new HashMap<>();
 
     private String key(String table, String column) {
         return table.toLowerCase() + "." + column.toLowerCase();
     }
-
+    /**
+     * Creates a hash index on the specified column.
+     */
     public void createIndex(String name, String table, String column, Collection<Integer> ids, java.util.function.IntFunction<String> getter) {
         String key = key(table, column);
         if (indexes.containsKey(key)) {
@@ -26,7 +31,6 @@ public class IndexManager {
         }
 
         Map<String, Set<Integer>> index = new HashMap<>();
-
         for (int id : ids) {
             String value = getter.apply(id);
             if (value != null) {
@@ -38,11 +42,15 @@ public class IndexManager {
         indexes.put(key, index);
         indexNames.put(key, name);
     }
-
+    /**
+     * Checks for the existence of an index.
+     */
     public boolean hasIndex(String table, String column) {
         return indexes.containsKey(key(table, column));
     }
-
+    /**
+     * Returns a copy of the set of IDs found by value.
+     */
     public Set<Integer> find(String table, String column, String value) {
         Map<String, Set<Integer>> index = indexes.get(key(table, column));
         if (index == null) {
@@ -51,7 +59,9 @@ public class IndexManager {
 
         return new HashSet<>(index.getOrDefault(value, Collections.emptySet()));
     }
-
+    /**
+     * Adds an entry to an existing index.
+     */
     public void add(String table, String column, String value, int id) {
         Map<String, Set<Integer>> index = indexes.get(key(table, column));
         if (index != null) {
@@ -59,7 +69,9 @@ public class IndexManager {
             index.get(value).add(id);
         }
     }
-
+    /**
+     * Removes an entry from an existing index.
+     */
     public void remove(String table, String column, String value, int id) {
         Map<String, Set<Integer>> index = indexes.get(key(table, column));
         if (index == null) return;
@@ -71,7 +83,9 @@ public class IndexManager {
             }
         }
     }
-
+    /**
+     * @return a copy of the list of indexed table.column pairs
+     */
     public Set<String> indexedColumns() {
         return new HashSet<>(indexes.keySet());
     }
