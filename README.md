@@ -2,11 +2,11 @@
 
 ## Запуск
 
-cd путь/к/папке_с_проектом
+- cd путь/к/папке_с_проектом
 
-javac -encoding UTF-8 -sourcepath src -d out src/library/Main.java
+- javac -encoding UTF-8 -sourcepath src -d out src/library/Main.java
 
-java -cp out library.Main
+- java -cp out library.Main
 
 
 При запуске из корня проекта данные размещаются в `data/`.
